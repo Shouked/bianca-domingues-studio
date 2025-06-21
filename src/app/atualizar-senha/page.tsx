@@ -1,13 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 
 export default function UpdatePasswordPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -25,43 +24,25 @@ export default function UpdatePasswordPage() {
     const errorCode = params.get('error_code')
     const errorDescription = params.get('error_description')
 
-
     if (errorParam) {
-        console.error("Erro no token de atualização de senha:", errorDescription);
-        setError(`Erro ao processar link: ${errorDescription || errorParam} (Código: ${errorCode})`);
-        setIsValidToken(false);
-        return;
+      console.error("Erro no token de atualização de senha:", errorDescription);
+      setError(`Erro ao processar link: ${errorDescription || errorParam} (Código: ${errorCode})`);
+      setIsValidToken(false);
+      return;
     }
 
     if (!accessToken) {
-      // Se não houver token de acesso na URL, pode ser que o usuário esteja vindo de um SIGNED_IN após o signUp.
-      // Ou o link é inválido/expirado.
-      // Vamos verificar se há uma sessão ativa, o que acontece após o link de confirmação de email.
-      // O link de recuperação de senha do Supabase geralmente inclui o type=recovery no hash.
       const type = params.get('type');
       if (type === 'recovery') {
-         // Se for 'recovery' e não tiver accessToken, o link provavelmente está malformado ou já foi usado.
-         // No entanto, o Supabase lida com isso no `updateUser`.
+        // Se for 'recovery' e não tiver accessToken, o link provavelmente está malformado ou já foi usado.
       }
       // Não definimos isValidToken como false imediatamente, pois updateUser pode funcionar se houver sessão.
     } else {
-        // Se há um access_token, é provável que seja um link de recuperação.
-        // Não há necessidade de verificar explicitamente o token aqui, 
-        // supabase.auth.updateUser fará isso.
+      // access_token existe, então provavelmente é um link válido.
     }
 
-    // Tratamento para o evento de login via link mágico (PKCE)
-    // Se o usuário acabou de confirmar o email ou resetar a senha, o Supabase pode ter criado uma sessão.
-    // O evento onAuthStateChange no Layout.tsx deve lidar com o redirecionamento se uma sessão for estabelecida.
-    // Aqui, apenas preparamos para a atualização da senha.
-    
-    // Para a página de atualização de senha, o usuário precisa estar autenticado por meio do link.
-    // O Supabase trata isso automaticamente ao redirecionar. Se o usuário chegar aqui,
-    // o `updateUser` abaixo tentará usar a sessão estabelecida pelo link.
     setIsValidToken(true); // Assume que se chegou aqui, o Supabase gerenciou o token. O erro aparecerá no submit.
-
   }, [])
-
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,8 +51,8 @@ export default function UpdatePasswordPage() {
       return
     }
     if (password.length < 6) {
-        setError('A senha deve ter pelo menos 6 caracteres.')
-        return
+      setError('A senha deve ter pelo menos 6 caracteres.')
+      return
     }
 
     setError(null)
@@ -108,7 +89,6 @@ export default function UpdatePasswordPage() {
     );
   }
 
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8 bg-white p-10 rounded-xl shadow-lg">
@@ -137,7 +117,7 @@ export default function UpdatePasswordPage() {
             </div>
           )}
 
-          {!successMessage && isValidToken && ( // Mostrar formulário apenas se não houver sucesso e token parecer válido
+          {!successMessage && isValidToken && (
             <>
               <div>
                 <label htmlFor="password" className="sr-only">
@@ -181,12 +161,12 @@ export default function UpdatePasswordPage() {
             </>
           )}
         </form>
-        {(successMessage || !isValidToken) && ( // Mostrar link de login se sucesso ou token inválido
-             <div className="text-center mt-4">
-                <Link href="/login" className="font-medium text-pink-600 hover:text-pink-500">
-                    Ir para Login
-                </Link>
-            </div>
+        {(successMessage || !isValidToken) && (
+          <div className="text-center mt-4">
+            <Link href="/login" className="font-medium text-pink-600 hover:text-pink-500">
+              Ir para Login
+            </Link>
+          </div>
         )}
       </div>
     </div>

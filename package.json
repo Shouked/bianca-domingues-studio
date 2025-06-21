@@ -15,6 +15,7 @@
     "test:build": "npm run build && npm run start"
   },
   "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.50.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.522.0",

@@ -6,11 +6,11 @@ import { Calendar, momentLocalizer } from 'react-big-calendar'
 import moment from 'moment'
 import 'moment/locale/pt-br'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
-import { 
-  Plus, 
-  Calendar as CalendarIcon, 
-  Clock, 
-  User, 
+import {
+  Plus,
+  Calendar as CalendarIcon,
+  Clock,
+  User,
   DollarSign,
   X,
   Edit,
@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import Layout from '@/components/Layout'
 
-// Configure moment locale
+// Configura o locale do moment
 moment.locale('pt-br')
 const localizer = momentLocalizer(moment)
 
@@ -44,62 +44,57 @@ interface CalendarEvent {
   end: Date
   resource: {
     id: string
-    client?: { full_name: string; phone: string }
-    procedures?: { name: string }[]
+    client_id: string
     appointment_date: string
     total_value: number
     status: string
     created_at: string
+    client?: { id: string; full_name: string; phone: string; created_at: string }
+    procedures?: { id: string; name: string; created_at: string }[]
   }
 }
 
 export default function AppointmentsPage() {
-  const { 
-    clients, 
-    procedures, 
-    appointments, 
-    fetchClients, 
-    fetchProcedures, 
+  const {
+    clients,
+    procedures,
+    appointments,
+    fetchClients,
+    fetchProcedures,
     fetchAppointments,
     addAppointment,
-    updateAppointment, // Adicionado
-    deleteAppointment, // Adicionado
-    loading 
+    updateAppointment,
+    deleteAppointment,
+    loading
   } = useAppStore()
-  
+
   const [view, setView] = useState<'calendar' | 'form'>('calendar')
-  const [editingAppointment, setEditingAppointment] = useState<CalendarEvent['resource'] | null>(null) // Para edição
-  const [showModal, setShowModal] = useState(false) // Modal de detalhes do evento
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent['resource'] | null>(null) // Evento selecionado no calendário
-  
+  const [editingAppointment, setEditingAppointment] = useState<CalendarEvent['resource'] | null>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent['resource'] | null>(null)
+
   const initialFormData: AppointmentFormData = {
     client_id: '',
     procedure_ids: [],
     appointment_date: '',
-    total_value: 0,
-    // status: 'agendado' // Status inicial pode ser definido aqui se não vier do backend no edit
+    total_value: 0
   }
   const [formData, setFormData] = useState<AppointmentFormData>(initialFormData)
   const [formErrors, setFormErrors] = useState<AppointmentFormErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-
   useEffect(() => {
-    // Fetch inicial de dados
-    // Considerar se o loading global do useAppStore é suficiente ou se precisa de loading local.
     fetchClients()
     fetchProcedures()
     fetchAppointments()
   }, [fetchClients, fetchProcedures, fetchAppointments])
 
-  // Convert appointments to calendar events
   const calendarEvents: CalendarEvent[] = appointments.map(appointment => {
     const startDate = new Date(appointment.appointment_date)
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // 1 hour duration
-    
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
     return {
       id: appointment.id,
-      title: `${appointment.client?.full_name} - ${appointment.procedures?.map(p => p.name).join(', ')}`,
+      title: `${appointment.client?.full_name || ''}${appointment.procedures?.length ? ' - ' + appointment.procedures.map(p => p.name).join(', ') : ''}`,
       start: startDate,
       end: endDate,
       resource: appointment
@@ -108,23 +103,19 @@ export default function AppointmentsPage() {
 
   const validateForm = () => {
     const errors: AppointmentFormErrors = {}
-    
+
     if (!formData.client_id) {
       errors.client_id = 'Cliente é obrigatório'
     }
-    
     if (formData.procedure_ids.length === 0) {
       errors.procedure_ids = 'Pelo menos um procedimento deve ser selecionado'
     }
-    
     if (!formData.appointment_date) {
       errors.appointment_date = 'Data e hora são obrigatórias'
     }
-    
     if (formData.total_value <= 0) {
       errors.total_value = 'Valor deve ser maior que zero'
     }
-    
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -141,45 +132,41 @@ export default function AppointmentsPage() {
         client_id: formData.client_id,
         appointment_date: formData.appointment_date,
         total_value: formData.total_value,
-        status: editingAppointment ? editingAppointment.status : 'agendado', 
-      };
+        status: editingAppointment ? editingAppointment.status : 'agendado'
+      }
 
       if (editingAppointment) {
         await updateAppointment(editingAppointment.id, appointmentPayload, formData.procedure_ids)
       } else {
         await addAppointment(appointmentPayload, formData.procedure_ids)
       }
-      
       closeFormAndReset()
-      // fetchAppointments() // Opcional, store deve ter atualizado.
     } catch (error: any) {
       console.error('Erro ao salvar agendamento:', error)
-      setFormErrors({ client_id: `Erro: ${error.message}` }) // Erro genérico
+      setFormErrors({ client_id: `Erro: ${error.message}` })
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleEdit = () => {
-    if (!selectedEvent) return;
+    if (!selectedEvent) return
     setEditingAppointment(selectedEvent)
     setFormData({
-      client_id: selectedEvent.client?.id || '',
-  procedure_ids: selectedEvent.procedures?.map((p: any) => p.id) || [],
-  appointment_date: new Date(selectedEvent.appointment_date).toISOString().slice(0, 16),
-  total_value: selectedEvent.total_value, 
-      // status: selectedEvent.status // Status não é editável diretamente no form, mas pode ser necessário
+      client_id: selectedEvent.client_id || '',
+      procedure_ids: selectedEvent.procedures?.map((p: any) => p.id) || [],
+      appointment_date: new Date(selectedEvent.appointment_date).toISOString().slice(0, 16),
+      total_value: selectedEvent.total_value
     })
-    setShowModal(false) // Fecha o modal de detalhes
-    setView('form')     // Abre o formulário em modo de edição
+    setShowModal(false)
+    setView('form')
   }
 
   const handleDelete = async () => {
-    if (!selectedEvent || !confirm('Tem certeza que deseja cancelar este agendamento?')) return;
+    if (!selectedEvent || !confirm('Tem certeza que deseja cancelar este agendamento?')) return
     try {
       await deleteAppointment(selectedEvent.id)
       closeModal()
-      // fetchAppointments(); // Opcional
     } catch (error: any) {
       console.error('Erro ao cancelar agendamento:', error)
       alert(`Erro ao cancelar agendamento: ${error.message}`)
@@ -188,7 +175,7 @@ export default function AppointmentsPage() {
 
   const handleEventSelect = (event: CalendarEvent) => {
     setSelectedEvent(event.resource)
-    setEditingAppointment(null) // Limpa qualquer edição pendente ao abrir detalhes
+    setEditingAppointment(null)
     setShowModal(true)
   }
 
@@ -196,7 +183,6 @@ export default function AppointmentsPage() {
     const newProcedureIds = formData.procedure_ids.includes(procedureId)
       ? formData.procedure_ids.filter(id => id !== procedureId)
       : [...formData.procedure_ids, procedureId]
-    
     setFormData({ ...formData, procedure_ids: newProcedureIds })
   }
 
@@ -212,12 +198,9 @@ export default function AppointmentsPage() {
     const formattedDate = date.toLocaleDateString('pt-BR')
     const formattedTime = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     const procedures = appointment.procedures?.map((p: any) => p.name).join(', ') || ''
-    
-    const message = `Olá ${appointment.client?.full_name}! Passando para confirmar seu agendamento de ${procedures} amanhã, dia ${formattedDate}, às ${formattedTime}. Atenciosamente, Bianca Domingues.`
-    
+    const message = `Olá ${appointment.client?.full_name}! Passando para confirmar seu agendamento de ${procedures} amanhã, dia ${formattedDate}, às ${formattedTime}. Atenciosamente, Bianca Domingues Studio.`
     const phone = appointment.client?.phone?.replace(/\D/g, '') || ''
     const whatsappUrl = `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`
-    
     window.open(whatsappUrl, '_blank')
   }
 
@@ -225,19 +208,11 @@ export default function AppointmentsPage() {
     setShowModal(false)
     setSelectedEvent(null)
   }
-  // ✅ ADICIONE ESTA FUNÇÃO ABAIXO:
-  const closeFormAndReset = () => {
-  setView('calendar')
-  setFormData(initialFormData)
-  setEditingAppointment(null)
 
-    return (
-      <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
-        </div>
-      </Layout>
-    )
+  const closeFormAndReset = () => {
+    setView('calendar')
+    setFormData(initialFormData)
+    setEditingAppointment(null)
   }
 
   return (
@@ -304,10 +279,10 @@ export default function AppointmentsPage() {
                 formats={{
                   monthHeaderFormat: 'MMMM YYYY',
                   dayHeaderFormat: 'dddd, DD [de] MMMM',
-                  dayRangeHeaderFormat: ({ start, end }) => 
+                  dayRangeHeaderFormat: ({ start, end }) =>
                     `${moment(start).format('DD MMM')} - ${moment(end).format('DD MMM YYYY')}`,
                   timeGutterFormat: 'HH:mm',
-                  eventTimeRangeFormat: ({ start, end }) => 
+                  eventTimeRangeFormat: ({ start, end }) =>
                     `${moment(start).format('HH:mm')} - ${moment(end).format('HH:mm')}`
                 }}
                 style={{ height: '100%' }}
@@ -319,8 +294,9 @@ export default function AppointmentsPage() {
         {/* Form View */}
         {view === 'form' && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-6">Novo Agendamento</h2>
-            
+            <h2 className="text-lg font-medium text-gray-900 mb-6">
+              {editingAppointment ? 'Editar Agendamento' : 'Novo Agendamento'}
+            </h2>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Client Selection */}
               <div>
@@ -330,7 +306,7 @@ export default function AppointmentsPage() {
                 <select
                   id="client_id"
                   value={formData.client_id}
-                  onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                  onChange={e => setFormData({ ...formData, client_id: e.target.value })}
                   className={`mt-1 block w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-1 ${
                     formErrors.client_id
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
@@ -338,7 +314,7 @@ export default function AppointmentsPage() {
                   }`}
                 >
                   <option value="">Selecione um cliente</option>
-                  {clients.map((client) => (
+                  {clients.map(client => (
                     <option key={client.id} value={client.id}>
                       {client.full_name}
                     </option>
@@ -355,7 +331,7 @@ export default function AppointmentsPage() {
                   Procedimentos
                 </label>
                 <div className="space-y-2">
-                  {procedures.map((procedure) => (
+                  {procedures.map(procedure => (
                     <label key={procedure.id} className="flex items-center">
                       <input
                         type="checkbox"
@@ -381,7 +357,7 @@ export default function AppointmentsPage() {
                   type="datetime-local"
                   id="appointment_date"
                   value={formData.appointment_date}
-                  onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })}
+                  onChange={e => setFormData({ ...formData, appointment_date: e.target.value })}
                   className={`mt-1 block w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-1 ${
                     formErrors.appointment_date
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
@@ -404,7 +380,7 @@ export default function AppointmentsPage() {
                   step="0.01"
                   min="0"
                   value={formData.total_value}
-                  onChange={(e) => setFormData({ ...formData, total_value: parseFloat(e.target.value) || 0 })}
+                  onChange={e => setFormData({ ...formData, total_value: parseFloat(e.target.value) || 0 })}
                   className={`mt-1 block w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-1 ${
                     formErrors.total_value
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
@@ -441,14 +417,12 @@ export default function AppointmentsPage() {
         {showModal && selectedEvent && (
           <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div 
-                className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+              <div
+                className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
                 aria-hidden="true"
                 onClick={closeModal}
               ></div>
-              
               <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              
               <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div className="flex items-center justify-between mb-4">
@@ -464,7 +438,6 @@ export default function AppointmentsPage() {
                       <X className="h-6 w-6" />
                     </button>
                   </div>
-                  
                   <div className="space-y-4">
                     <div className="flex items-center">
                       <User className="h-5 w-5 text-gray-400 mr-3" />
@@ -473,7 +446,6 @@ export default function AppointmentsPage() {
                         <p className="text-sm text-gray-500">{selectedEvent.client?.phone}</p>
                       </div>
                     </div>
-                    
                     <div className="flex items-center">
                       <Clock className="h-5 w-5 text-gray-400 mr-3" />
                       <div>
@@ -481,14 +453,13 @@ export default function AppointmentsPage() {
                           {new Date(selectedEvent.appointment_date).toLocaleDateString('pt-BR')}
                         </p>
                         <p className="text-sm text-gray-500">
-                          {new Date(selectedEvent.appointment_date).toLocaleTimeString('pt-BR', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
+                          {new Date(selectedEvent.appointment_date).toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit'
                           })}
                         </p>
                       </div>
                     </div>
-                    
                     <div className="flex items-start">
                       <CalendarIcon className="h-5 w-5 text-gray-400 mr-3 mt-0.5" />
                       <div>
@@ -498,7 +469,6 @@ export default function AppointmentsPage() {
                         </p>
                       </div>
                     </div>
-                    
                     <div className="flex items-center">
                       <DollarSign className="h-5 w-5 text-gray-400 mr-3" />
                       <div>
@@ -508,10 +478,9 @@ export default function AppointmentsPage() {
                         <p className="text-sm text-gray-500">Valor total</p>
                       </div>
                     </div>
-                    
                     <div className="flex items-center">
                       <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selectedEvent.status === 'agendado' 
+                        selectedEvent.status === 'agendado'
                           ? 'bg-blue-100 text-blue-800'
                           : selectedEvent.status === 'concluído'
                           ? 'bg-green-100 text-green-800'
@@ -522,7 +491,6 @@ export default function AppointmentsPage() {
                     </div>
                   </div>
                 </div>
-                
                 <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button
                     type="button"
@@ -534,6 +502,7 @@ export default function AppointmentsPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={handleEdit}
                     className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     <Edit className="h-4 w-4 mr-2" />
@@ -541,6 +510,7 @@ export default function AppointmentsPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={handleDelete}
                     className="mt-3 w-full inline-flex justify-center rounded-md border border-red-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -555,4 +525,3 @@ export default function AppointmentsPage() {
     </Layout>
   )
 }
-
