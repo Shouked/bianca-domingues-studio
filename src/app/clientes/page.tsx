@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { Search, Plus, Phone, Edit, Trash2, X } from 'lucide-react'
 import Layout from '@/components/Layout'
 
+// A interface Client pode ser importada do store se for exportada de lá
 interface Client {
   id: string
   full_name: string
@@ -18,7 +19,15 @@ interface ClientFormData {
 }
 
 export default function ClientsPage() {
-  const { clients, fetchClients, addClient, loading } = useAppStore()
+  const { 
+    clients, 
+    fetchClients, 
+    addClient, 
+    updateClient, 
+    deleteClient, 
+    loading 
+  } = useAppStore()
+  
   const [searchTerm, setSearchTerm] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
@@ -27,6 +36,7 @@ export default function ClientsPage() {
     phone: ''
   })
   const [formErrors, setFormErrors] = useState<Partial<ClientFormData>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     fetchClients()
@@ -34,10 +44,11 @@ export default function ClientsPage() {
 
   const filteredClients = clients.filter(client =>
     client.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.phone.includes(searchTerm)
+    (client.phone && client.phone.includes(searchTerm)) // Adicionar verificação se client.phone existe
   )
 
-  const formatPhone = (phone: string) => {
+  const formatPhone = (phone: string | null | undefined): string => {
+    if (!phone) return '';
     // Remove all non-digits
     const digits = phone.replace(/\D/g, '')
     

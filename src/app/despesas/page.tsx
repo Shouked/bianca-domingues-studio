@@ -9,15 +9,30 @@ import {
   DollarSign,
   FileText,
   Filter,
-  Search
+  Search,
+  Edit, // Ícone de Editar
+  Trash2 // Ícone de Excluir
 } from 'lucide-react'
 import Layout from '@/components/Layout'
+import { Expense } from '@/store/useAppStore' // Supondo que Expense seja exportado
+
+
+// A interface Expense pode ser importada do store se for exportada de lá
+// interface Expense {
+//   id: string;
+//   category: string;
+//   amount: number;
+//   expense_date: string;
+//   notes: string | null;
+//   created_at: string;
+// }
+
 
 interface ExpenseFormData {
   category: string
   amount: number
   expense_date: string
-  notes: string
+  notes: string | null // Permitir null para notes
 }
 
 interface ExpenseFormErrors {
@@ -37,9 +52,17 @@ const EXPENSE_CATEGORIES = [
 ]
 
 export default function ExpensesPage() {
-  const { expenses, fetchExpenses, addExpense, loading } = useAppStore()
+  const { 
+    expenses, 
+    fetchExpenses, 
+    addExpense, 
+    updateExpense, // Adicionado
+    deleteExpense, // Adicionado
+    loading 
+  } = useAppStore()
   
   const [showForm, setShowForm] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null) // Para edição
   const [formData, setFormData] = useState<ExpenseFormData>({
     category: '',
     amount: 0,
@@ -47,6 +70,7 @@ export default function ExpensesPage() {
     notes: ''
   })
   const [formErrors, setFormErrors] = useState<ExpenseFormErrors>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [filterCategory, setFilterCategory] = useState<string>('')
   const [filterMonth, setFilterMonth] = useState<string>(new Date().toISOString().slice(0, 7))
 
@@ -55,6 +79,7 @@ export default function ExpensesPage() {
   }, [fetchExpenses])
 
   // Filter expenses based on category and month
+  // Ordenar despesas pela data da despesa, mais recentes primeiro
   const filteredExpenses = expenses.filter(expense => {
     const expenseDate = new Date(expense.expense_date)
     const expenseMonth = expenseDate.toISOString().slice(0, 7)

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 
@@ -8,7 +8,6 @@ export const metadata: Metadata = {
   title: 'Bianca Domingues - Gestão de Estúdio',
   description: 'Sistema completo para gestão de estúdio de beleza',
   manifest: '/manifest.json',
-  themeColor: '#ec4899',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -28,8 +27,15 @@ export const metadata: Metadata = {
     apple: [
       { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }
     ]
-  },
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1'
+  }
+}
+
+// ✅ Correção: export separado para viewport
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#ec4899'
 }
 
 export default function RootLayout({
@@ -58,4 +64,3 @@ export default function RootLayout({
     </html>
   )
 }
-
