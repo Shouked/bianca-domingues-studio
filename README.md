@@ -4,13 +4,15 @@ Sistema completo para gestão de estúdio de beleza desenvolvido com Next.js, Su
 
 ## 🚀 Funcionalidades
 
-- **Dashboard** - Visão geral do negócio com métricas principais
-- **Gestão de Clientes** - CRUD completo para cadastro e gerenciamento de clientes
-- **Agendamentos** - Sistema de agendamento com calendário visual e integração WhatsApp
-- **Controle de Despesas** - Registro e categorização de despesas com filtros
-- **Relatórios Financeiros** - Análise de desempenho com gráficos interativos
-- **PWA** - Aplicativo web progressivo com notificações push
-- **Responsivo** - Interface adaptada para desktop e mobile
+- **Autenticação de Usuários:** Cadastro, Login, Recuperação de Senha.
+- **Dashboard:** Visão geral do negócio com métricas principais.
+- **Gestão de Clientes:** CRUD completo para cadastro e gerenciamento de clientes.
+- **Gestão de Procedimentos:** CRUD completo para os serviços oferecidos.
+- **Agendamentos:** Sistema de agendamento com calendário visual, criação, edição e cancelamento. Integração com WhatsApp para lembretes (manual).
+- **Controle de Despesas:** CRUD completo para registro e categorização de despesas com filtros.
+- **Relatórios Financeiros:** Análise de desempenho com gráficos interativos.
+- **PWA:** Aplicativo web progressivo com notificações push (configuração básica).
+- **Responsivo:** Interface adaptada para desktop e mobile.
 
 ## 🛠️ Tecnologias
 

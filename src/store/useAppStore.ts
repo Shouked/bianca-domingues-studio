@@ -44,11 +44,23 @@ interface AppState {
   // Actions
   fetchClients: () => Promise<void>
   fetchProcedures: () => Promise<void>
+  addProcedure: (procedure: Omit<Procedure, 'id' | 'created_at'>) => Promise<Procedure | null>
+  updateProcedure: (id: string, procedureData: Partial<Omit<Procedure, 'id' | 'created_at'>>) => Promise<Procedure | null>
+  deleteProcedure: (id: string) => Promise<boolean>
+
   fetchAppointments: () => Promise<void>
   fetchExpenses: () => Promise<void>
   addClient: (client: Omit<Client, 'id' | 'created_at'>) => Promise<void>
-  addAppointment: (appointment: Omit<Appointment, 'id' | 'created_at'>) => Promise<void>
-  addExpense: (expense: Omit<Expense, 'id' | 'created_at'>) => Promise<void>
+  updateClient: (id: string, clientData: Partial<Omit<Client, 'id' | 'created_at'>>) => Promise<void>
+  deleteClient: (id: string) => Promise<void>
+
+  addAppointment: (appointment: Omit<Appointment, 'id' | 'created_at' | 'client' | 'procedures'>, procedureIds: string[]) => Promise<Appointment | null>
+  updateAppointment: (id: string, appointmentData: Partial<Omit<Appointment, 'id' | 'created_at' | 'client' | 'procedures'>>, procedureIds: string[]) => Promise<Appointment | null>
+  deleteAppointment: (id: string) => Promise<boolean>
+
+  addExpense: (expense: Omit<Expense, 'id' | 'created_at'>) => Promise<Expense | null>
+  updateExpense: (id: string, expenseData: Partial<Omit<Expense, 'id' | 'created_at'>>) => Promise<Expense | null>
+  deleteExpense: (id: string) => Promise<boolean>
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -58,60 +70,208 @@ export const useAppStore = create<AppState>((set, get) => ({
   expenses: [],
   loading: false,
 
+  // --- CLIENTS ---
   fetchClients: async () => {
+    set({ loading: true })
     if (!supabase) {
-      // Mock data for demonstration
+      console.log("Supabase not configured, using mock data for clients.");
       set({ 
         clients: [
-          { id: '1', full_name: 'Maria Silva', phone: '(11) 99999-9999', created_at: new Date().toISOString() },
-          { id: '2', full_name: 'Ana Santos', phone: '(11) 88888-8888', created_at: new Date().toISOString() }
-        ]
+          { id: '1', full_name: 'Maria Silva (Mock)', phone: '(11) 99999-9999', created_at: new Date().toISOString() },
+          { id: '2', full_name: 'Ana Santos (Mock)', phone: '(11) 88888-8888', created_at: new Date().toISOString() }
+        ],
+        loading: false
       })
       return
     }
     
-    set({ loading: true })
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .order('created_at', { ascending: false })
-      
+      const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false })
       if (error) throw error
       set({ clients: data || [] })
     } catch (error) {
       console.error('Erro ao buscar clientes:', error)
+      set({ clients: [] }) // Evita manter dados antigos em caso de erro
     } finally {
       set({ loading: false })
     }
   },
 
-  fetchProcedures: async () => {
+  addClient: async (clientData) => {
     if (!supabase) {
-      // Mock data for demonstration
+      console.log("Supabase not configured, mocking addClient.");
+      const newClient = { id: Date.now().toString(), ...clientData, created_at: new Date().toISOString() }
+      set((state) => ({ clients: [newClient, ...state.clients] }))
+      return
+    }
+    try {
+      const { data, error } = await supabase.from('clients').insert([clientData]).select()
+      if (error) throw error
+      if (data) set((state) => ({ clients: [data[0], ...state.clients] }))
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error)
+      throw error
+    }
+  },
+
+  updateClient: async (id, clientData) => {
+    if (!supabase) {
+      console.log("Supabase not configured, mocking updateClient.");
+      set((state) => ({
+        clients: state.clients.map((c) => (c.id === id ? { ...c, ...clientData } : c)),
+      }))
+      return
+    }
+    try {
+      const { data, error } = await supabase.from('clients').update(clientData).eq('id', id).select()
+      if (error) throw error
+      if (data) {
+        set((state) => ({
+          clients: state.clients.map((c) => (c.id === id ? data[0] : c)),
+        }))
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar cliente:', error)
+      throw error
+    }
+  },
+
+  deleteClient: async (id) => {
+     if (!supabase) {
+      console.log("Supabase not configured, mocking deleteClient.");
+      set((state) => ({ clients: state.clients.filter((c) => c.id !== id) }))
+      return
+    }
+    try {
+      // Primeiro, verificar se o cliente tem agendamentos associados
+      const { data: appointmentsData, error: appointmentsError } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('client_id', id)
+        .limit(1)
+
+      if (appointmentsError) throw appointmentsError;
+
+      if (appointmentsData && appointmentsData.length > 0) {
+        throw new Error('Este cliente não pode ser excluído pois possui agendamentos associados.');
+      }
+
+      const { error } = await supabase.from('clients').delete().eq('id', id)
+      if (error) throw error
+      set((state) => ({ clients: state.clients.filter((c) => c.id !== id) }))
+    } catch (error) {
+      console.error('Erro ao deletar cliente:', error)
+      throw error
+    }
+  },
+
+  // --- PROCEDURES ---
+  fetchProcedures: async () => {
+    // Não setar loading aqui para permitir loading individual em outras fetches
+    if (!supabase) {
+      console.log("Supabase not configured, using mock data for procedures.");
       set({ 
         procedures: [
-          { id: '1', name: 'Extensão de Cílios', created_at: new Date().toISOString() },
-          { id: '2', name: 'Design de Sobrancelhas', created_at: new Date().toISOString() },
-          { id: '3', name: 'Lash Lifting', created_at: new Date().toISOString() }
+          { id: '1', name: 'Extensão de Cílios (Mock)', created_at: new Date().toISOString() },
+          { id: '2', name: 'Design de Sobrancelhas (Mock)', created_at: new Date().toISOString() },
+          { id: '3', name: 'Lash Lifting (Mock)', created_at: new Date().toISOString() }
         ]
       })
       return
     }
-    
     try {
-      const { data, error } = await supabase
-        .from('procedures')
-        .select('*')
-        .order('name')
-      
+      const { data, error } = await supabase.from('procedures').select('*').order('name')
       if (error) throw error
       set({ procedures: data || [] })
     } catch (error) {
       console.error('Erro ao buscar procedimentos:', error)
+      set({ procedures: [] })
     }
   },
 
+  addProcedure: async (procedureData) => {
+    if (!supabase) {
+      console.log("Supabase not configured, mocking addProcedure.");
+      const newProcedure = { id: Date.now().toString(), ...procedureData, created_at: new Date().toISOString() }
+      set((state) => ({ procedures: [...state.procedures, newProcedure].sort((a,b) => a.name.localeCompare(b.name)) }))
+      return newProcedure;
+    }
+    try {
+      const { data, error } = await supabase.from('procedures').insert([procedureData]).select()
+      if (error) throw error
+      if (data && data.length > 0) {
+        set((state) => ({ procedures: [...state.procedures, data[0]].sort((a,b) => a.name.localeCompare(b.name)) }))
+        return data[0]
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao adicionar procedimento:', error)
+      throw error
+    }
+  },
+
+  updateProcedure: async (id, procedureData) => {
+    if (!supabase) {
+      console.log("Supabase not configured, mocking updateProcedure.");
+      let updatedProc: Procedure | null = null;
+      set((state) => ({
+        procedures: state.procedures.map((p) => {
+          if (p.id === id) {
+            updatedProc = { ...p, ...procedureData };
+            return updatedProc;
+          }
+          return p;
+        }).sort((a,b) => a.name.localeCompare(b.name)),
+      }))
+      return updatedProc;
+    }
+    try {
+      const { data, error } = await supabase.from('procedures').update(procedureData).eq('id', id).select()
+      if (error) throw error
+      if (data && data.length > 0) {
+        set((state) => ({
+          procedures: state.procedures.map((p) => (p.id === id ? data[0] : p)).sort((a,b) => a.name.localeCompare(b.name)),
+        }))
+        return data[0];
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao atualizar procedimento:', error)
+      throw error
+    }
+  },
+
+  deleteProcedure: async (id) => {
+    if (!supabase) {
+      console.log("Supabase not configured, mocking deleteProcedure.");
+      set((state) => ({ procedures: state.procedures.filter((p) => p.id !== id) }))
+      return true;
+    }
+    try {
+      const { data: appointmentProcedures, error: checkError } = await supabase
+        .from('appointment_procedures')
+        .select('id')
+        .eq('procedure_id', id)
+        .limit(1)
+
+      if (checkError) throw checkError;
+
+      if (appointmentProcedures && appointmentProcedures.length > 0) {
+        // Em vez de alert, vamos lançar um erro para ser tratado na UI
+        throw new Error('Este procedimento não pode ser excluído pois está associado a um ou mais agendamentos.');
+      }
+
+      const { error } = await supabase.from('procedures').delete().eq('id', id)
+      if (error) throw error
+      set((state) => ({ procedures: state.procedures.filter((p) => p.id !== id) }))
+      return true;
+    } catch (error) {
+      console.error('Erro ao deletar procedimento:', error)
+      throw error // Re-throw para ser pego na UI
+    }
+  },
+
+  // --- APPOINTMENTS ---
   fetchAppointments: async () => {
     if (!supabase) {
       // Mock data for demonstration

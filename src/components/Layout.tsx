@@ -3,16 +3,21 @@
 import { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { ReactNode, useState, useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 import { 
   Home, 
   Users, 
   Calendar, 
   Receipt, 
   BarChart3,
+  Package, // Ícone para Procedimentos
   Menu,
-  X
+  X,
+  LogOut
 } from 'lucide-react'
-import { useState } from 'react'
 import NotificationSettings from './NotificationSettings'
 
 interface LayoutProps {
@@ -23,13 +28,96 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Clientes', href: '/clientes', icon: Users },
   { name: 'Agendamentos', href: '/agendamentos', icon: Calendar },
+  { name: 'Procedimentos', href: '/procedimentos', icon: Package },
   { name: 'Despesas', href: '/despesas', icon: Receipt },
   { name: 'Relatórios', href: '/relatorios', icon: BarChart3 },
 ]
 
 export default function Layout({ children }: LayoutProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [user, setUser] = useState<any>(null) // Idealmente, use um tipo mais específico para o usuário
+  const [loadingAuth, setLoadingAuth] = useState(true)
+
+  useEffect(() => {
+    const checkUser = async () => {
+      if (!supabase) {
+        // Modo de simulação sem Supabase
+        const isLoggedIn = localStorage.getItem('isLoggedIn')
+        if (!isLoggedIn && pathname !== '/login' && pathname !== '/cadastro') {
+          router.push('/login')
+        } else if (isLoggedIn && (pathname === '/login' || pathname === '/cadastro')) {
+          router.push('/')
+        }
+        setLoadingAuth(false)
+        return
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      setUser(session?.user ?? null)
+
+      if (!session?.user && pathname !== '/login' && pathname !== '/cadastro') {
+        router.push('/login')
+      } else if (session?.user && (pathname === '/login' || pathname === '/cadastro')) {
+        // Se usuário logado tentar acessar /login ou /cadastro, redireciona para home
+        router.push('/')
+      }
+      setLoadingAuth(false)
+    }
+
+    checkUser()
+
+    if (supabase) {
+      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        setUser(session?.user ?? null)
+        if (event === 'SIGNED_OUT' || (!session?.user && pathname !== '/login' && pathname !== '/cadastro')) {
+          router.push('/login')
+        } else if (event === 'SIGNED_IN' && (pathname === '/login' || pathname === '/cadastro')) {
+          router.push('/')
+        }
+      })
+
+      return () => {
+        authListener?.subscription.unsubscribe()
+      }
+    }
+  }, [pathname, router])
+
+  const handleLogout = async () => {
+    if (!supabase) {
+      // Modo de simulação sem Supabase
+      localStorage.removeItem('isLoggedIn')
+      router.push('/login')
+      return
+    }
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  if (loadingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-100">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-pink-600"></div>
+      </div>
+    )
+  }
+
+  // Se for a página de login ou cadastro, não renderiza o layout principal
+  if (pathname === '/login' || pathname === '/cadastro') {
+    return <>{children}</>
+  }
+
+  // Se não estiver autenticado e não for página de login/cadastro (fallback, deve ser pego pelo useEffect)
+  if (!user && !localStorage.getItem('isLoggedIn') && pathname !== '/login' && pathname !== '/cadastro') {
+     // Este return pode ser um loader mais simples ou null, pois o useEffect já deve ter redirecionado
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-gray-100">
+          <p>Redirecionando para login...</p>
+        </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -70,6 +158,15 @@ export default function Layout({ children }: LayoutProps) {
               )
             })}
           </nav>
+          <div className="border-t border-gray-200 p-2">
+            <button
+              onClick={handleLogout}
+              className="group flex w-full items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            >
+              <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
+              Sair
+            </button>
+          </div>
         </div>
       </div>
 
@@ -102,6 +199,15 @@ export default function Layout({ children }: LayoutProps) {
               )
             })}
           </nav>
+          <div className="border-t border-gray-200 p-2">
+            <button
+              onClick={handleLogout}
+              className="group flex w-full items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            >
+              <LogOut className="mr-3 h-5 w-5 text-gray-400 group-hover:text-gray-500" />
+              Sair
+            </button>
+          </div>
         </div>
       </div>
 
@@ -116,15 +222,19 @@ export default function Layout({ children }: LayoutProps) {
           >
             <Menu className="h-6 w-6" />
           </button>
-          <h1 className="text-lg font-semibold text-gray-900">Bianca Domingues</h1>
-          <div className="ml-auto">
+          <div className="flex-1 text-lg font-semibold text-gray-900">Bianca Domingues</div>
+          <div className="flex items-center gap-x-4">
             <NotificationSettings />
+            {/* O botão de logout para mobile pode ser adicionado aqui se desejado, ou apenas no sidebar */}
           </div>
         </div>
 
         {/* Desktop header */}
         <div className="hidden lg:flex lg:h-16 lg:shrink-0 lg:items-center lg:justify-end lg:border-b lg:border-gray-200 lg:bg-white lg:px-6 lg:shadow-sm">
-          <NotificationSettings />
+          <div className="flex items-center gap-x-4">
+            <NotificationSettings />
+            {/* O botão de logout para desktop já está no sidebar, mas poderia estar aqui também */}
+          </div>
         </div>
 
         {/* Page content */}
