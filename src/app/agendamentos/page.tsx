@@ -62,21 +62,31 @@ export default function AppointmentsPage() {
     fetchProcedures, 
     fetchAppointments,
     addAppointment,
+    updateAppointment, // Adicionado
+    deleteAppointment, // Adicionado
     loading 
   } = useAppStore()
   
   const [view, setView] = useState<'calendar' | 'form'>('calendar')
-  const [showModal, setShowModal] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<any>(null)
-  const [formData, setFormData] = useState<AppointmentFormData>({
+  const [editingAppointment, setEditingAppointment] = useState<CalendarEvent['resource'] | null>(null) // Para edição
+  const [showModal, setShowModal] = useState(false) // Modal de detalhes do evento
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent['resource'] | null>(null) // Evento selecionado no calendário
+
+  const initialFormData: AppointmentFormData = {
     client_id: '',
     procedure_ids: [],
     appointment_date: '',
-    total_value: 0
-  })
+    total_value: 0,
+    // status: 'agendado' // Status inicial pode ser definido aqui se não vier do backend no edit
+  }
+  const [formData, setFormData] = useState<AppointmentFormData>(initialFormData)
   const [formErrors, setFormErrors] = useState<AppointmentFormErrors>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
 
   useEffect(() => {
+    // Fetch inicial de dados
+    // Considerar se o loading global do useAppStore é suficiente ou se precisa de loading local.
     fetchClients()
     fetchProcedures()
     fetchAppointments()
@@ -121,34 +131,64 @@ export default function AppointmentsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!validateForm()) return
-    
+    if (!validateForm() || isSubmitting) return
+
+    setIsSubmitting(true)
+    setFormErrors({})
+
     try {
-      await addAppointment({
+      const appointmentPayload = {
         client_id: formData.client_id,
         appointment_date: formData.appointment_date,
         total_value: formData.total_value,
-        status: 'agendado'
-      })
+        status: editingAppointment ? editingAppointment.status : 'agendado',
+      };
+
+      if (editingAppointment) {
+        await updateAppointment(editingAppointment.id, appointmentPayload, formData.procedure_ids)
+      } else {
+        await addAppointment(appointmentPayload, formData.procedure_ids)
+      }
       
-      // TODO: Add appointment_procedures entries
-      
-      setView('calendar')
-      setFormData({
-        client_id: '',
-        procedure_ids: [],
-        appointment_date: '',
-        total_value: 0
-      })
-      setFormErrors({})
-    } catch (error) {
+      closeFormAndReset()
+      // fetchAppointments() // Opcional, store deve ter atualizado.
+    } catch (error: any) {
       console.error('Erro ao salvar agendamento:', error)
+      setFormErrors({ client_id: `Erro: ${error.message}` }) // Erro genérico
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleEdit = () => {
+    if (!selectedEvent) return;
+    setEditingAppointment(selectedEvent)
+    setFormData({
+      client_id: selectedEvent.client_id,
+      procedure_ids: selectedEvent.procedures?.map((p: any) => p.id) || [], // Tipar 'p' como 'any' ou a interface correta de Procedure
+      appointment_date: new Date(selectedEvent.appointment_date).toISOString().slice(0, 16), // Formato para datetime-local
+      total_value: selectedEvent.total_value,
+      // status: selectedEvent.status // Status não é editável diretamente no form, mas pode ser necessário
+    })
+    setShowModal(false) // Fecha o modal de detalhes
+    setView('form')     // Abre o formulário em modo de edição
+  }
+
+  const handleDelete = async () => {
+    if (!selectedEvent || !confirm('Tem certeza que deseja cancelar este agendamento?')) return;
+    try {
+      await deleteAppointment(selectedEvent.id)
+      closeModal()
+      // fetchAppointments(); // Opcional
+    } catch (error: any) {
+      console.error('Erro ao cancelar agendamento:', error)
+      alert(`Erro ao cancelar agendamento: ${error.message}`)
     }
   }
 
   const handleEventSelect = (event: CalendarEvent) => {
     setSelectedEvent(event.resource)
+    setEditingAppointment(null) // Limpa qualquer edição pendente ao abrir detalhes
     setShowModal(true)
   }
 
